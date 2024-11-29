@@ -58,7 +58,7 @@
                         ref="fileInput"
                         multiple
                         @change="handleFileUpload"
-                        accept=".mp4"
+                        accept=".mp4, .mov"
                         class="file-input"
                         hidden="hidden"
                     />
@@ -305,19 +305,19 @@ export default {
 
         async addFiles(files) {
             for (const file of files) {
-                if (file.type === "video/mp4") {
+                const allowedTypes = ["video/mp4", "video/quicktime"];
+                if (allowedTypes.includes(file.type)) {
                     try {
                         this.errorMessage = "";
-
                         await this.uploadFileToBackend(file);
                     } catch (error) {
                         this.errorMessage = "Error: " + error.message;
                     }
                 } else {
-                    this.errorMessage = "Only .mp4 files are allowed";
+                    this.errorMessage = "Only .mp4 and .mov files are allowed";
                 }
             }
-        },
+        }
 
         handleFileUpload(event) {
             const files = Array.from(event.target.files);
