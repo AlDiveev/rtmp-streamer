@@ -1,9 +1,7 @@
-version: '3.9'
-
 services:
     vite-app:
         image: nginx:alpine
-        container_name: vite-production
+        container_name: video-streamer
         ports:
             - "80:80"
         volumes:

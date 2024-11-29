@@ -183,7 +183,7 @@ export default {
                 const encodedFileName = this.encodeToBase64(file.name);
 
                 const response = await fetch(
-                    `http://localhost:3000/api/storage/${streamSession}/${encodedFileName}`,
+                    `http://146.190.40.226:3000/api/storage/${streamSession}/${encodedFileName}`,
                     {
                         method: "DELETE",
                     }
@@ -209,6 +209,32 @@ export default {
                 });
         },
 
+        async checkActiveStream() {
+            try {
+                const response = await fetch("http://146.190.40.226:3000/api/stream/list");
+                if (!response.ok) {
+                    throw new Error("Failed to fetch active streams.");
+                }
+                const data = await response.json();
+
+                const streamSession = this.$route.params['session'];
+
+                // Проверяем, существует ли активный процесс с текущей сессией
+                const activeStream = data.activeProcesses.find(
+                    (process) => process.name === streamSession
+                );
+
+                if (activeStream) {
+                    this.isStreaming = true;
+                    this.rtmpUrl = activeStream.spawnargs.find(arg => arg.startsWith("rtmp://"));
+                    console.log("Active stream found:", activeStream);
+                }
+            } catch (error) {
+                console.error("Error checking active stream:", error.message);
+                this.errorMessage = `Error checking active stream: ${error.message}`;
+            }
+        },
+
         async fetchFilesFromBackend() {
             try {
                 const streamSession = this.$route.params['session'];
@@ -216,7 +242,7 @@ export default {
                     throw new Error("Stream session parameter is missing.");
                 }
 
-                const response = await fetch(`http://localhost:3000/api/storage/${streamSession}/list`);
+                const response = await fetch(`http://146.190.40.226:3000/api/storage/${streamSession}/list`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch file list from the server.");
                 }
@@ -242,7 +268,7 @@ export default {
                 formData.append("file", file);
 
                 const xhr = new XMLHttpRequest();
-                xhr.open("POST", `http://localhost:3000/api/storage/${streamSession}/upload`, true);
+                xhr.open("POST", `http://146.190.40.226:3000/api/storage/${streamSession}/upload`, true);
 
                 xhr.upload.onprogress = (event) => {
                     if (event.lengthComputable) {
@@ -330,7 +356,7 @@ export default {
                 this.isStreaming = true;
                 this.errorMessage = "";
 
-                const response = await fetch("http://localhost:3000/api/stream/create", {
+                const response = await fetch("http://146.190.40.226:3000/api/stream/create", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
@@ -358,7 +384,7 @@ export default {
                 const streamSession = this.$route.params['session'];
                 if (!this.isStreaming) return;
 
-                const response = await fetch(`http://localhost:3000/api/stream/stop/${streamSession}`, {
+                const response = await fetch(`http://146.190.40.226:3000/api/stream/stop/${streamSession}`, {
                     method: "GET",
                 });
 
@@ -417,6 +443,7 @@ export default {
     },
     mounted() {
         this.fetchFilesFromBackend();
+        this.checkActiveStream();
     },
 };
 
