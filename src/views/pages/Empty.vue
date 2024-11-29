@@ -317,7 +317,7 @@ export default {
                     this.errorMessage = "Only .mp4 and .mov files are allowed";
                 }
             }
-        }
+        },
 
         handleFileUpload(event) {
             const files = Array.from(event.target.files);
