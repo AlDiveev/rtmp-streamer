@@ -425,6 +425,7 @@ export default {
 
 
                const  file =  this.selectedFile.savedPath.replace(".mp4.", ".flv")
+
                 const response = await fetch(`https://${this.API_BASE_URL}:3000/api/stream/create`, {
                     method: "POST",
                     headers: {
