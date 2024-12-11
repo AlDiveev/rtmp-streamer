@@ -77,18 +77,30 @@
                         <h3>Select uploaded Files</h3>
                     </header>
                     <div class="finder-content">
+
+
+
                         <div
                             v-for="(file, index) in uploadedFiles"
                             :key="index"
                             class="file-item"
+                            :class="{ 'selected': selectedFile === file, 'processing': this.isProcessing }"
                             @click="selectFile(file)"
-                            :class="{ 'selected': selectedFile === file }"
-                            :title="file.name"
                         >
                             <div class="file-icon">
-                                <i class="pi pi-file text-color-secondary" style="font-size: 2.0rem"></i>
+                                <i
+                                    v-if="!this.isProcessing"
+                                    class="pi pi-file text-color-secondary"
+                                    style="font-size: 2.0rem"
+                                ></i>
+                                <img
+                                    v-if="this.isProcessing"
+                                    src="/public/preload.gif"
+                                    alt="Loading..."
+                                    class="preloader-icon"
+                                />
                             </div>
-                            <p class="file-name" >{{ truncateFileName(file.name) }}</p>
+                            <p class="file-name">{{ truncateFileName(file.name) }}</p>
 
                             <!-- Кнопка для удаления -->
                             <button @click.stop="removeFile(file)" class="delete-button" title="Delete file">
@@ -97,6 +109,8 @@
                         </div>
                     </div>
                 </div>
+
+
             </div>
 
             <!-- RTMP Server URL + Stream Key -->
@@ -147,6 +161,7 @@
 export default {
     data() {
         return {
+            API_BASE_URL: "theytube.live",
             uploadedFiles: [],
             selectedFile: null,
             rtmpUrl: "",
@@ -157,12 +172,17 @@ export default {
             progressInterval: null,
             videoDuration: 300,
             progressUpload: 0,
+            isProcessing: false,
+            isReady: false,
+
         };
     },
     computed: {
-        isReadyToStream() {
-            return this.selectedFile && this.rtmpUrl && !this.isStreaming;
-        },
+        // isReadyToStream() {
+        //     return this.selectedFile && this.rtmpUrl && !this.isStreaming;
+        // },
+
+
         currentUrl() {
             return window.location.href;
         },
@@ -170,9 +190,51 @@ export default {
     },
     methods: {
 
+        isReadyToStream() {
+            return this.selectedFile?.isReady && this.rtmpUrl && !this.isStreaming;
+        },
+
         encodeToBase64(str) {
             return btoa(unescape(encodeURIComponent(str)));
         },
+
+        async checkConversionStatus(file) {
+            try {
+                const response = await fetch(`https://${this.API_BASE_URL}:3000/api/stream/check-source`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        session: this.$route.params["session"],
+                        videoName: file.name,
+                    }),
+                });
+
+                if (!response.ok) {
+                    throw new Error("Failed to check file status");
+                }
+
+                const data = await response.json();
+                return data.message === "File is ready for streaming";
+            } catch (error) {
+                console.error("Error checking file status:", error.message);
+                this.errorMessage = `Error checking file status: ${error.message}`;
+                return false;
+            }
+        },
+        async monitorFileConversion(file) {
+            this.isProcessing = true;
+            const interval = setInterval(async () => {
+                const isReady = await this.checkConversionStatus(file);
+                if (isReady) {
+                    clearInterval(interval);
+                    this.isProcessing = false;
+                    this.isReady = true;
+                }
+            }, 5000);
+        },
+
         async removeFile(file) {
             try {
                 const streamSession = this.$route.params['session'];
@@ -183,7 +245,7 @@ export default {
                 const encodedFileName = this.encodeToBase64(file.name);
 
                 const response = await fetch(
-                    `https://theytube.live:3000/api/storage/${streamSession}/${encodedFileName}`,
+                    `https://${this.API_BASE_URL}:3000/api/storage/${streamSession}/${encodedFileName}`,
                     {
                         method: "DELETE",
                     }
@@ -211,7 +273,7 @@ export default {
 
         async checkActiveStream() {
             try {
-                const response = await fetch("https://theytube.live:3000/api/stream/list");
+                const response = await fetch(`https://${this.API_BASE_URL}:3000/api/stream/list`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch active streams.");
                 }
@@ -242,7 +304,7 @@ export default {
                     throw new Error("Stream session parameter is missing.");
                 }
 
-                const response = await fetch(`https://theytube.live:3000/api/storage/${streamSession}/list`);
+                const response = await fetch(`https://${this.API_BASE_URL}:3000/api/storage/${streamSession}/list`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch file list from the server.");
                 }
@@ -268,7 +330,7 @@ export default {
                 formData.append("file", file);
 
                 const xhr = new XMLHttpRequest();
-                xhr.open("POST", `https://theytube.live:3000/api/storage/${streamSession}/upload`, true);
+                xhr.open("POST", `https://${this.API_BASE_URL}:3000/api/storage/${streamSession}/upload`, true);
 
                 xhr.upload.onprogress = (event) => {
                     if (event.lengthComputable) {
@@ -302,7 +364,6 @@ export default {
             }
         },
 
-
         async addFiles(files) {
             for (const file of files) {
                 const allowedTypes = ["video/mp4", "video/quicktime"];
@@ -310,6 +371,11 @@ export default {
                     try {
                         this.errorMessage = "";
                         await this.uploadFileToBackend(file);
+                        this.isProcessing = false;
+                        this.isReady = false;
+                        this.uploadedFiles.push(file);
+
+                        this.monitorFileConversion(file);
                     } catch (error) {
                         this.errorMessage = "Error: " + error.message;
                     }
@@ -318,6 +384,7 @@ export default {
                 }
             }
         },
+
 
         handleFileUpload(event) {
             const files = Array.from(event.target.files);
@@ -356,7 +423,7 @@ export default {
                 this.isStreaming = true;
                 this.errorMessage = "";
 
-                const response = await fetch("https://theytube.live:3000/api/stream/create", {
+                const response = await fetch(`https://${this.API_BASE_URL}:3000/api/stream/create`, {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
@@ -384,7 +451,7 @@ export default {
                 const streamSession = this.$route.params['session'];
                 if (!this.isStreaming) return;
 
-                const response = await fetch(`https://theytube.live:3000/api/stream/stop/${streamSession}`, {
+                const response = await fetch(`https://${this.API_BASE_URL}:3000/api/stream/stop/${streamSession}`, {
                     method: "GET",
                 });
 
@@ -768,6 +835,16 @@ input {
 
 .delete-button:hover {
     color: darkred;
+}
+
+.file-item.processing {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.preloader-icon {
+    width: 30px;
+    height: 30px;
 }
 
 </style>
