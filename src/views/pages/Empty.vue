@@ -288,7 +288,7 @@ export default {
 
                 if (activeStream) {
                     this.isStreaming = true;
-                    this.rtmpUrl = activeStream.spawnargs.find(arg => arg.startsWith("rtmp://"));
+                    this.rtmpUrl = activeStream.ffmpeg.find(arg => arg.startsWith("rtmp://"));
                     console.log("Active stream found:", activeStream);
                 }
             } catch (error) {
