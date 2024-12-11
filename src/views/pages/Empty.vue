@@ -423,6 +423,8 @@ export default {
                 this.isStreaming = true;
                 this.errorMessage = "";
 
+
+               const  file =  this.selectedFile.savedPath.replace(".mp4.", ".flv")
                 const response = await fetch(`https://${this.API_BASE_URL}:3000/api/stream/create`, {
                     method: "POST",
                     headers: {
@@ -430,7 +432,7 @@ export default {
                     },
                     body: JSON.stringify({
                         name: streamSession,
-                        videoPath: this.selectedFile.savedPath,
+                        videoPath: file,
                         rtmpTarget: this.rtmpUrl,
                     }),
                 });
